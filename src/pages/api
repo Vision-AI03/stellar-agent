@@ -1,0 +1,142 @@
+// src/pages/api/dashboard-data.ts
+import { NextApiRequest, NextApiResponse } from 'next';
+
+// Interface para os dados que chegam via POST
+interface IncomingDashboardData {
+  tempo_medio_resposta?: number;
+  total_atendimentos?: number;
+  leads_captados?: number;
+  conversoes?: number;
+  satisfacao?: number;
+  variacao_tempo?: number;
+  variacao_atendimentos?: number;
+  variacao_leads?: number;
+  variacao_conversoes?: number;
+  variacao_satisfacao?: number;
+  atendimentos_semana?: Array<{
+    semana: string;
+    quantidade: number;
+  }>;
+  ultimos_atendimentos?: Array<{
+    data: string;
+    nome: string;
+    status: string;
+  }>;
+  periodo?: string;
+}
+
+// Armazenamento em memória (em produção, use um banco de dados)
+let dashboardData: IncomingDashboardData | null = null;
+let lastUpdated: Date | null = null;
+
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Configurar CORS
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
+  try {
+    if (req.method === 'POST') {
+      // Receber e armazenar os dados
+      const incomingData: IncomingDashboardData = req.body;
+      
+      console.log('📊 Dados recebidos no dashboard:', incomingData);
+      
+      // Validar se os dados básicos estão presentes
+      if (!incomingData.total_atendimentos && !incomingData.tempo_medio_resposta) {
+        return res.status(400).json({ 
+          error: 'Dados insuficientes. Envie pelo menos total_atendimentos ou tempo_medio_resposta.' 
+        });
+      }
+
+      // Armazenar os dados
+      dashboardData = {
+        ...incomingData,
+        periodo: incomingData.periodo || new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+      };
+      
+      lastUpdated = new Date();
+
+      console.log('✅ Dados salvos com sucesso:', dashboardData);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Dados atualizados com sucesso',
+        timestamp: lastUpdated,
+        received_data: dashboardData
+      });
+
+    } else if (req.method === 'GET') {
+      // Retornar os dados armazenados
+      if (!dashboardData) {
+        return res.status(404).json({
+          error: 'Nenhum dado disponível ainda',
+          message: 'Aguarde o próximo envio de dados via POST'
+        });
+      }
+
+      // Transformar os dados para o formato esperado pelo frontend
+      const formattedData = {
+        metricas: {
+          tempoMedioResposta: {
+            valor: dashboardData.tempo_medio_resposta || 0,
+            unidade: 's',
+            variacao: dashboardData.variacao_tempo || 0
+          },
+          totalAtendimentos: {
+            valor: dashboardData.total_atendimentos || 0,
+            variacao: dashboardData.variacao_atendimentos || 0
+          },
+          leadsCaptados: {
+            valor: dashboardData.leads_captados || 0,
+            variacao: dashboardData.variacao_leads || 0
+          },
+          conversoes: {
+            valor: dashboardData.conversoes || 0,
+            variacao: dashboardData.variacao_conversoes || 0
+          },
+          satisfacao: {
+            valor: dashboardData.satisfacao || 0,
+            variacao: dashboardData.variacao_satisfacao || 0
+          }
+        },
+        atendimentosPorSemana: dashboardData.atendimentos_semana || [
+          { semana: 'Semana 1', atendimentos: 0 },
+          { semana: 'Semana 2', atendimentos: 0 },
+          { semana: 'Semana 3', atendimentos: 0 },
+          { semana: 'Semana 4', atendimentos: 0 }
+        ],
+        ultimosAtendimentos: dashboardData.ultimos_atendimentos?.map(item => ({
+          data: item.data,
+          nomeCliente: item.nome,
+          status: item.status as 'Convertido' | 'Novo Lead' | 'Em Andamento' | 'Resolvido'
+        })) || [],
+        periodo: dashboardData.periodo || 'Sem período definido',
+        lastUpdated: lastUpdated?.toISOString()
+      };
+
+      return res.status(200).json(formattedData);
+
+    } else {
+      // Método não permitido
+      return res.status(405).json({
+        error: 'Método não permitido',
+        allowed_methods: ['GET', 'POST']
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Erro no endpoint dashboard-data:', error);
+    
+    return res.status(500).json({
+      error: 'Erro interno do servidor',
+      message: error instanceof Error ? error.message : 'Erro desconhecido'
+    });
+  }
+}
