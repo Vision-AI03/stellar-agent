@@ -13,7 +13,7 @@ interface UseDashboardDataResult {
 
 export function useDashboardData(
   autoRefresh = true,
-  refreshInterval = 5 * 60 * 1000 // 5 minutos por padrão
+  refreshInterval = 60 * 60 * 1000 // 1 hora por padrão
 ): UseDashboardDataResult {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
