@@ -1,8 +1,10 @@
 // src/lib/api.ts
 import { DashboardData } from './types';
 
-// URL do seu HTTP Request (substitua pela URL real)
-const API_BASE_URL = 'https://hooks.zapier.com/hooks/catch/sua-url-aqui';
+// URL do seu endpoint local - será algo como: https://seu-dominio.vercel.app/api/dashboard-data
+const API_BASE_URL = process.env.NODE_ENV === 'development' 
+  ? 'http://localhost:3000/api' 
+  : 'https://seu-dominio.vercel.app/api'; // SUBSTITUA por sua URL real
 
 export class DashboardAPI {
   static async fetchDashboardData(): Promise<DashboardData> {
@@ -12,62 +14,45 @@ export class DashboardAPI {
         headers: {
           'Content-Type': 'application/json',
         },
+        // Cache bust para garantir dados frescos
+        cache: 'no-store'
       });
 
       if (!response.ok) {
+        if (response.status === 404) {
+          console.log('📭 Nenhum dado disponível ainda, usando dados mockados');
+          return this.getMockData();
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const data = await response.json();
-      return this.transformData(data);
+      console.log('📊 Dados recebidos do endpoint:', data);
+      
+      return data;
     } catch (error) {
-      console.error('Erro ao buscar dados do dashboard:', error);
+      console.error('❌ Erro ao buscar dados do dashboard:', error);
       // Retorna dados mockados em caso de erro
       return this.getMockData();
     }
   }
 
-  // Transforma os dados recebidos da API para o formato esperado
-  private static transformData(rawData: any): DashboardData {
-    return {
-      metricas: {
-        tempoMedioResposta: {
-          valor: rawData.tempo_medio || 12,
-          unidade: 's',
-          variacao: rawData.variacao_tempo || 8.5
+  // Método para testar o endpoint (opcional)
+  static async testEndpoint(testData: any): Promise<boolean> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/dashboard-data`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        totalAtendimentos: {
-          valor: rawData.total_atendimentos || 350,
-          variacao: rawData.variacao_atendimentos || 12.3
-        },
-        leadsCaptados: {
-          valor: rawData.leads_captados || 75,
-          variacao: rawData.variacao_leads || -5.2
-        },
-        conversoes: {
-          valor: rawData.conversoes || 22,
-          variacao: rawData.variacao_conversoes || 15.7
-        },
-        satisfacao: {
-          valor: rawData.satisfacao || 92,
-          variacao: rawData.variacao_satisfacao || 3.1
-        }
-      },
-      atendimentosPorSemana: rawData.atendimentos_semana || [
-        { semana: 'Semana 1', atendimentos: 80 },
-        { semana: 'Semana 2', atendimentos: 95 },
-        { semana: 'Semana 3', atendimentos: 87 },
-        { semana: 'Semana 4', atendimentos: 82 }
-      ],
-      ultimosAtendimentos: rawData.ultimos_atendimentos || [
-        { data: '2024-11-25', nomeCliente: 'João Silva', status: 'Convertido' },
-        { data: '2024-11-24', nomeCliente: 'Maria Santos', status: 'Novo Lead' },
-        { data: '2024-11-24', nomeCliente: 'Pedro Oliveira', status: 'Em Andamento' },
-        { data: '2024-11-23', nomeCliente: 'Ana Costa', status: 'Resolvido' },
-        { data: '2024-11-23', nomeCliente: 'Carlos Mendes', status: 'Convertido' }
-      ],
-      periodo: rawData.periodo || 'Novembro'
-    };
+        body: JSON.stringify(testData)
+      });
+
+      return response.ok;
+    } catch (error) {
+      console.error('❌ Erro ao testar endpoint:', error);
+      return false;
+    }
   }
 
   // Dados mockados para desenvolvimento/fallback
@@ -93,25 +78,8 @@ export class DashboardAPI {
         { data: '2024-11-23', nomeCliente: 'Ana Costa', status: 'Resolvido' },
         { data: '2024-11-23', nomeCliente: 'Carlos Mendes', status: 'Convertido' }
       ],
-      periodo: 'Novembro'
+      periodo: 'Novembro (Dados Mock)',
+      lastUpdated: new Date().toISOString()
     };
-  }
-
-  // Método para enviar dados via POST (se necessário)
-  static async sendDashboardData(data: any): Promise<boolean> {
-    try {
-      const response = await fetch(API_BASE_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data)
-      });
-
-      return response.ok;
-    } catch (error) {
-      console.error('Erro ao enviar dados:', error);
-      return false;
-    }
   }
 }
