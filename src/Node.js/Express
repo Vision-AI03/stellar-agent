@@ -1,0 +1,28 @@
+// server.js
+const express = require('express');
+const cors = require('cors');
+const app = express();
+
+app.use(cors());
+app.use(express.json());
+
+let dashboardData = null;
+
+// Endpoint para receber dados
+app.post('/api/dashboard-data', (req, res) => {
+  dashboardData = req.body;
+  console.log('Dados recebidos:', dashboardData);
+  res.json({ success: true, data: dashboardData });
+});
+
+// Endpoint para buscar dados
+app.get('/api/dashboard-data', (req, res) => {
+  if (!dashboardData) {
+    return res.status(404).json({ error: 'Nenhum dado disponível' });
+  }
+  res.json(dashboardData);
+});
+
+app.listen(3001, () => {
+  console.log('API rodando na porta 3001');
+});
