@@ -4,7 +4,7 @@ import { DashboardData } from './types';
 // URL do seu endpoint local - será algo como: https://seu-dominio.vercel.app/api/dashboard-data
 const API_BASE_URL = process.env.NODE_ENV === 'development' 
   ? 'http://localhost:3000/api' 
-  : 'https://seu-dominio.vercel.app/api'; // SUBSTITUA por sua URL real
+  : 'https://dashboard.agenciavisionai.com/api';
 
 export class DashboardAPI {
   static async fetchDashboardData(): Promise<DashboardData> {
