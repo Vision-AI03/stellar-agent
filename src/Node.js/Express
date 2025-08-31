@@ -1,28 +1,166 @@
-// server.js
-const express = require('express');
-const cors = require('cors');
-const app = express();
+// src/Node.js/Express.js
+import express from 'express';
+import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const app = express();
+const PORT = process.env.PORT || 3001;
+
+// Middleware
 app.use(cors());
 app.use(express.json());
 
+// Servir arquivos estáticos do build do Vite
+app.use(express.static(path.join(__dirname, '../../dist')));
+
+// Armazenamento em memória dos dados do dashboard
 let dashboardData = null;
 
-// Endpoint para receber dados
+// Endpoint para receber dados via POST
 app.post('/api/dashboard-data', (req, res) => {
-  dashboardData = req.body;
-  console.log('Dados recebidos:', dashboardData);
-  res.json({ success: true, data: dashboardData });
-});
+  try {
+    const incomingData = req.body;
+    console.log('📊 Dados recebidos:', incomingData);
 
-// Endpoint para buscar dados
-app.get('/api/dashboard-data', (req, res) => {
-  if (!dashboardData) {
-    return res.status(404).json({ error: 'Nenhum dado disponível' });
+    // Validação básica
+    if (!incomingData || Object.keys(incomingData).length === 0) {
+      return res.status(400).json({ 
+        success: false,
+        error: 'Nenhum dado fornecido' 
+      });
+    }
+
+    // Converter dados para formato do dashboard
+    dashboardData = {
+      metricas: {
+        tempoMedioResposta: {
+          valor: incomingData.tempo_medio_resposta || 0,
+          unidade: 's',
+          variacao: incomingData.variacao_tempo || 0
+        },
+        totalAtendimentos: {
+          valor: incomingData.total_atendimentos || 0,
+          variacao: incomingData.variacao_atendimentos || 0
+        },
+        leadsCaptados: {
+          valor: incomingData.leads_captados || 0,
+          variacao: incomingData.variacao_leads || 0
+        },
+        conversoes: {
+          valor: incomingData.conversoes || 0,
+          variacao: incomingData.variacao_conversoes || 0
+        },
+        satisfacao: {
+          valor: incomingData.satisfacao || 0,
+          variacao: incomingData.variacao_satisfacao || 0
+        }
+      },
+      atendimentosPorSemana: incomingData.atendimentos_semana || [
+        { semana: 'Semana 1', atendimentos: Math.floor((incomingData.total_atendimentos || 0) * 0.25) },
+        { semana: 'Semana 2', atendimentos: Math.floor((incomingData.total_atendimentos || 0) * 0.28) },
+        { semana: 'Semana 3', atendimentos: Math.floor((incomingData.total_atendimentos || 0) * 0.22) },
+        { semana: 'Semana 4', atendimentos: Math.floor((incomingData.total_atendimentos || 0) * 0.25) }
+      ],
+      ultimosAtendimentos: incomingData.ultimos_atendimentos || [
+        { data: new Date().toISOString().split('T')[0], nomeCliente: 'João Silva', status: 'Convertido' },
+        { data: new Date(Date.now() - 86400000).toISOString().split('T')[0], nomeCliente: 'Maria Santos', status: 'Novo Lead' },
+        { data: new Date(Date.now() - 172800000).toISOString().split('T')[0], nomeCliente: 'Pedro Oliveira', status: 'Em Andamento' }
+      ],
+      periodo: incomingData.periodo || `Atualizado em ${new Date().toLocaleString('pt-BR')}`,
+      lastUpdated: new Date().toISOString()
+    };
+
+    console.log('✅ Dados salvos com sucesso');
+
+    res.status(200).json({
+      success: true,
+      message: 'Dados atualizados com sucesso',
+      data: dashboardData
+    });
+
+  } catch (error) {
+    console.error('❌ Erro ao processar dados:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erro interno do servidor'
+    });
   }
-  res.json(dashboardData);
 });
 
-app.listen(3001, () => {
-  console.log('API rodando na porta 3001');
+// Endpoint para buscar dados via GET
+app.get('/api/dashboard-data', (req, res) => {
+  try {
+    if (!dashboardData) {
+      // Dados mockados se não houver dados reais
+      const mockData = {
+        metricas: {
+          tempoMedioResposta: { valor: 12, unidade: 's', variacao: 8.5 },
+          totalAtendimentos: { valor: 350, variacao: 12.3 },
+          leadsCaptados: { valor: 75, variacao: -5.2 },
+          conversoes: { valor: 22, variacao: 15.7 },
+          satisfacao: { valor: 92, variacao: 3.1 }
+        },
+        atendimentosPorSemana: [
+          { semana: 'Semana 1', atendimentos: 80 },
+          { semana: 'Semana 2', atendimentos: 95 },
+          { semana: 'Semana 3', atendimentos: 87 },
+          { semana: 'Semana 4', atendimentos: 82 }
+        ],
+        ultimosAtendimentos: [
+          { data: '2024-11-25', nomeCliente: 'João Silva (Mock)', status: 'Convertido' },
+          { data: '2024-11-24', nomeCliente: 'Maria Santos (Mock)', status: 'Novo Lead' },
+          { data: '2024-11-24', nomeCliente: 'Pedro Oliveira (Mock)', status: 'Em Andamento' }
+        ],
+        periodo: 'Dados Mock - Aguardando dados reais',
+        lastUpdated: new Date().toISOString()
+      };
+      
+      return res.status(200).json(mockData);
+    }
+
+    console.log('📊 Retornando dados salvos');
+    res.status(200).json(dashboardData);
+
+  } catch (error) {
+    console.error('❌ Erro ao buscar dados:', error);
+    res.status(500).json({
+      error: 'Erro interno do servidor'
+    });
+  }
+});
+
+// Health check
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
+
+// Servir o frontend para todas as outras rotas
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../dist/index.html'));
+});
+
+// Iniciar servidor
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor rodando na porta ${PORT}`);
+  console.log(`📊 API disponível em: http://localhost:${PORT}/api/dashboard-data`);
+  console.log(`🌐 Frontend disponível em: http://localhost:${PORT}`);
+});
+
+// Tratamento de erros
+process.on('uncaughtException', (err) => {
+  console.error('❌ Erro não capturado:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Promise rejeitada não tratada:', reason);
+  process.exit(1);
 });
