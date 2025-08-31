@@ -1,9 +1,9 @@
 // src/lib/api.ts
 import { DashboardData } from './types';
 
-// URL do seu endpoint local - será algo como: https://seu-dominio.vercel.app/api/dashboard-data
+// src/lib/api.ts
 const API_BASE_URL = process.env.NODE_ENV === 'development' 
-  ? 'http://localhost:3000/api' 
+  ? 'http://localhost:3001/api' 
   : 'https://dashboard.agenciavisionai.com/api';
 
 export class DashboardAPI {
